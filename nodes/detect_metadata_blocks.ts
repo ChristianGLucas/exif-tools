@@ -44,11 +44,17 @@ export async function detectMetadataBlocks(ax: AxiomContext, input: ImageBytes):
         mergeOutput: false,
         sanitize: true,
       }),
+      // ihdr/jfif must be explicitly disabled here too: exifr's PNG file
+      // parser enables `ihdr` by default regardless of these options, so a
+      // plain PNG with no XMP at all would otherwise come back as
+      // {ihdr:{...}} and be mistaken for XMP data (has_xmp:true).
       exifr.parse(safe.buffer, {
         tiff: false,
         xmp: true,
         icc: false,
         iptc: false,
+        ihdr: false,
+        jfif: false,
         mergeOutput: false,
         sanitize: true,
       }),

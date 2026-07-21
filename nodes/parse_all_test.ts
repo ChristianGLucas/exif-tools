@@ -1,7 +1,7 @@
 import { ImageBytes } from '../gen/messages_pb';
 import { parseAll } from './parse_all';
 import { testContext } from './testdata/context';
-import { buildFullJpeg, buildBareJpeg, KNOWN } from './testdata/fixtures';
+import { buildFullJpeg, buildBareJpeg, buildPng, KNOWN } from './testdata/fixtures';
 
 function makeInput(data: Buffer): ImageBytes {
   const input = new ImageBytes();
@@ -45,6 +45,17 @@ describe('ParseAll', () => {
     const full = buildFullJpeg();
     const truncated = full.subarray(0, Math.floor(full.length * 0.5));
     const result = await parseAll(testContext, makeInput(truncated));
+    expect(result.getBlocksPresentList()).not.toContain('xmp');
+    expect(result.getXmpJson()).toBe('');
+  });
+
+  it('does not mislabel a plain PNG\'s IHDR chunk as an "xmp" block (regression)', async () => {
+    // exifr's PNG file parser enables `ihdr` by default regardless of the
+    // options passed to the XMP-only call — any ordinary PNG without XMP
+    // used to come back with blocksPresent wrongly containing "xmp". No
+    // truncation/crafting needed. Found by a second review pass.
+    const png = buildPng(KNOWN.pngWidth, KNOWN.pngHeight, KNOWN.pngBitDepth, KNOWN.pngColorType);
+    const result = await parseAll(testContext, makeInput(png));
     expect(result.getBlocksPresentList()).not.toContain('xmp');
     expect(result.getXmpJson()).toBe('');
   });

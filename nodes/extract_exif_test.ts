@@ -1,7 +1,7 @@
 import { ImageBytes } from '../gen/messages_pb';
 import { extractExif } from './extract_exif';
 import { testContext } from './testdata/context';
-import { buildFullJpeg, buildBareJpeg, KNOWN } from './testdata/fixtures';
+import { buildFullJpeg, buildBareJpeg, buildPng, KNOWN } from './testdata/fixtures';
 
 function makeInput(data: Buffer): ImageBytes {
   const input = new ImageBytes();
@@ -49,6 +49,20 @@ describe('ExtractExif', () => {
     const result = await extractExif(testContext, makeInput(buildBareJpeg()));
     expect(result.getError()).toBeUndefined();
     expect(result.getFound()).toBe(false);
+  });
+
+  it('found=false for a plain PNG, not the PNG IHDR chunk mislabeled as EXIF (regression)', async () => {
+    // exifr's PNG file parser enables `ihdr` by default regardless of the
+    // options this node passes — a bare PNG with NO real EXIF data used to
+    // come back found=true with exif_json full of the PNG's own IHDR fields
+    // (ImageWidth/BitDepth/ColorType/...) mislabeled as EXIF. No
+    // truncation/crafting needed: any ordinary PNG hits this. Found via
+    // follow-up investigation after a second review pass caught the same
+    // bug class in the XMP nodes.
+    const png = buildPng(64, 32, 8, 2);
+    const result = await extractExif(testContext, makeInput(png));
+    expect(result.getFound()).toBe(false);
+    expect(result.getExifJson()).toBe('');
   });
 
   it('rejects empty input with a structured error', async () => {

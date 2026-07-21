@@ -48,11 +48,17 @@ export async function parseAll(ax: AxiomContext, input: ImageBytes): Promise<Par
         // tag set, and ExtractExif already makes the same choice.
         translateValues: false,
       }),
+      // ihdr/jfif must be explicitly disabled here too: exifr's PNG file
+      // parser enables `ihdr` by default regardless of these options, so a
+      // plain PNG with no XMP at all would otherwise come back as
+      // {ihdr:{...}} and be mistaken for XMP data.
       exifr.parse(safe.buffer, {
         tiff: false,
         xmp: true,
         icc: false,
         iptc: false,
+        ihdr: false,
+        jfif: false,
         mergeOutput: false,
         sanitize: true,
       }),

@@ -31,6 +31,12 @@ export async function extractExif(ax: AxiomContext, input: ImageBytes): Promise<
       xmp: false,
       icc: false,
       iptc: false,
+      // exifr's PNG file parser enables `ihdr` by DEFAULT regardless of
+      // these other options (it's a PNG-specific override, not the
+      // platform-wide default) — must be disabled explicitly, or a plain
+      // PNG with no EXIF at all would report found=true with the PNG's own
+      // IHDR chunk (ImageWidth/BitDepth/...) mislabeled as EXIF.
+      ihdr: false,
       mergeOutput: true,
       sanitize: true,
       // Keep translateKeys (named keys like "Orientation") but disable

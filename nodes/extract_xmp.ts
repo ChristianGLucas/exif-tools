@@ -33,11 +33,20 @@ export async function extractXmp(ax: AxiomContext, input: ImageBytes): Promise<X
     // exifr flattens XMP's namespace properties (dc, photoshop, xmpRights,
     // ...) directly into the parse result's root rather than nesting them
     // under a single "xmp" key. Disabling every other segment means
-    // whatever comes back IS the XMP data, grouped by namespace prefix.
+    // whatever comes back IS the XMP data, grouped by namespace prefix —
+    // EXCEPT exifr's PNG file parser enables `ihdr` by default regardless
+    // of these options ("we don't want jpegs/heic to pick it up... but we
+    // create it for every png file unless the user explicitly disables
+    // it" — exifr's own comment), so a plain PNG with no XMP at all would
+    // otherwise come back as {ihdr:{...}} and be mistaken for XMP data.
+    // ihdr/jfif must be disabled explicitly, not just left at their
+    // nominal defaults.
     const raw: any = await exifr.parse(safe.buffer, {
       tiff: false,
       iptc: false,
       icc: false,
+      ihdr: false,
+      jfif: false,
       xmp: true,
       mergeOutput: false,
       sanitize: true,

@@ -69,4 +69,16 @@ describe('DetectMetadataBlocks', () => {
     const result = await detectMetadataBlocks(testContext, makeInput(truncated));
     expect(result.getHasXmp()).toBe(false);
   });
+
+  it('reports has_xmp=false for a plain PNG, not the PNG IHDR chunk mislabeled as XMP (regression)', async () => {
+    // exifr's PNG file parser enables `ihdr` by default regardless of the
+    // options passed to the XMP-only call — any ordinary PNG without XMP
+    // used to come back as has_xmp:true. No truncation/crafting needed.
+    // Found by a second review pass.
+    const result = await detectMetadataBlocks(
+      testContext,
+      makeInput(buildPng(KNOWN.pngWidth, KNOWN.pngHeight, KNOWN.pngBitDepth, KNOWN.pngColorType))
+    );
+    expect(result.getHasXmp()).toBe(false);
+  });
 });

@@ -1,7 +1,7 @@
 import { ImageBytes } from '../gen/messages_pb';
 import { extractXmp } from './extract_xmp';
 import { testContext } from './testdata/context';
-import { buildFullJpeg, buildBareJpeg } from './testdata/fixtures';
+import { buildFullJpeg, buildBareJpeg, buildPng, KNOWN } from './testdata/fixtures';
 
 function makeInput(data: Buffer): ImageBytes {
   const input = new ImageBytes();
@@ -69,5 +69,20 @@ describe('ExtractXmp', () => {
     expect(result.getFound()).toBe(false);
     expect(result.getXmpJson()).toBe('');
     expect(result.getXmpJson()).not.toContain('errors');
+  });
+
+  it('found=false for a plain PNG with no XMP, not the PNG IHDR chunk mislabeled as XMP (regression)', async () => {
+    // exifr's PNG file parser enables the `ihdr` segment by default
+    // regardless of the options passed to an "xmp only" parse call — an
+    // XMP-only call on a plain PNG used to come back as {ihdr:{...}} and
+    // get reported as found=true with the PNG's own structural metadata
+    // mislabeled as XMP data. No truncation or crafting needed — any
+    // ordinary PNG without an XMP packet hits this. Found by a second,
+    // independent review pass after the first fix round.
+    const png = buildPng(KNOWN.pngWidth, KNOWN.pngHeight, KNOWN.pngBitDepth, KNOWN.pngColorType);
+    const result = await extractXmp(testContext, makeInput(png));
+    expect(result.getFound()).toBe(false);
+    expect(result.getXmpJson()).toBe('');
+    expect(result.getXmpJson()).not.toContain('ihdr');
   });
 });

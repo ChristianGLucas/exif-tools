@@ -30,6 +30,13 @@ export async function extractCameraInfo(ax: AxiomContext, input: ImageBytes): Pr
       xmp: false,
       icc: false,
       iptc: false,
+      // exifr's PNG file parser enables `ihdr` by default regardless of
+      // these options — disabled explicitly so a PNG's own IHDR chunk is
+      // never mistaken for camera EXIF data. (This node's found-check reads
+      // Make/Model specifically, not "any keys present", so it wasn't
+      // reachable as a false-positive here — disabled anyway for defense
+      // in depth and to keep every node's options consistent.)
+      ihdr: false,
       mergeOutput: true,
       sanitize: true,
     });

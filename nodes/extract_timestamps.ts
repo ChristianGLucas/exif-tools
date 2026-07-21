@@ -31,6 +31,12 @@ export async function extractTimestamps(ax: AxiomContext, input: ImageBytes): Pr
       xmp: false,
       icc: false,
       iptc: false,
+      // exifr's PNG file parser enables `ihdr` by default regardless of
+      // these options — disabled explicitly for consistency with the other
+      // nodes (this node's found-check reads specific timestamp fields, so
+      // it wasn't reachable as a false-positive here, but keeping options
+      // consistent avoids relying on that as the only safeguard).
+      ihdr: false,
       mergeOutput: true,
       sanitize: true,
     });
