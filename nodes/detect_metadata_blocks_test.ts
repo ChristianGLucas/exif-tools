@@ -46,4 +46,27 @@ describe('DetectMetadataBlocks', () => {
     const result = await detectMetadataBlocks(testContext, makeInput(Buffer.alloc(0)));
     expect(result.getError()?.getCode()).toBe('EMPTY_INPUT');
   });
+
+  it('falls back to the filename extension when magic bytes are ambiguous', async () => {
+    const input = new ImageBytes();
+    input.setData(Buffer.from('not a real image header, just some bytes'));
+    input.setFilename('photo.JPG');
+    const result = await detectMetadataBlocks(testContext, input);
+    expect(result.getDetectedFormat()).toBe('jpeg');
+  });
+
+  it('magic bytes always win over a mismatched filename', async () => {
+    const input = new ImageBytes();
+    input.setData(buildPng(KNOWN.pngWidth, KNOWN.pngHeight, KNOWN.pngBitDepth, KNOWN.pngColorType));
+    input.setFilename('not-actually.gif');
+    const result = await detectMetadataBlocks(testContext, input);
+    expect(result.getDetectedFormat()).toBe('png');
+  });
+
+  it('reports has_xmp=false, not a fabricated match, for a truncated XMP segment (regression)', async () => {
+    const full = buildFullJpeg();
+    const truncated = full.subarray(0, Math.floor(full.length * 0.5));
+    const result = await detectMetadataBlocks(testContext, makeInput(truncated));
+    expect(result.getHasXmp()).toBe(false);
+  });
 });

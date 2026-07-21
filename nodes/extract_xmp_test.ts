@@ -54,4 +54,20 @@ describe('ExtractXmp', () => {
     expect(json).not.toContain('root:');
     expect(json).not.toContain('/bin/bash');
   });
+
+  it('reports found=false, not a fabricated match, for a truncated XMP segment (regression)', async () => {
+    // exifr's default silentErrors behavior means a truncated XMP segment
+    // does not throw — it returns {errors: [...]} instead of real
+    // properties. Unfiltered, that used to read as found=true with garbage
+    // xmp_json ("{\"errors\":[{}]}"). Found by independent review; this is
+    // also exactly the "send a leading prefix of the file" pattern this
+    // package's own docs recommend, so it's a realistic caller input, not a
+    // contrived one.
+    const full = buildFullJpeg();
+    const truncated = full.subarray(0, Math.floor(full.length * 0.5));
+    const result = await extractXmp(testContext, makeInput(truncated));
+    expect(result.getFound()).toBe(false);
+    expect(result.getXmpJson()).toBe('');
+    expect(result.getXmpJson()).not.toContain('errors');
+  });
 });

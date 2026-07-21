@@ -46,4 +46,12 @@ describe('GetImageInfo', () => {
     const result = await getImageInfo(testContext, makeInput(Buffer.alloc(0)));
     expect(result.getError()?.getCode()).toBe('EMPTY_INPUT');
   });
+
+  it('falls back to the filename extension for format when magic bytes are ambiguous', async () => {
+    const input = new ImageBytes();
+    input.setData(Buffer.from('not a real image header'));
+    input.setFilename('scan.png');
+    const result = await getImageInfo(testContext, input);
+    expect(result.getFormat()).toBe('png');
+  });
 });

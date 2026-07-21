@@ -34,6 +34,17 @@ describe('ExtractExif', () => {
     expect(raw.LensMake).toBe(KNOWN.lensMake);
   });
 
+  it('never leaks GPS data into exif_json, even though the fixture has a GPS block (regression)', async () => {
+    // exifr does not fully honor gps:false when tiff+exif are both true with
+    // mergeOutput:true — GPS keys (and the derived latitude/longitude) leak
+    // into the merged result regardless. This node is EXIF-only by
+    // contract; GPS belongs to ExtractGps. Found by independent review.
+    const result = await extractExif(testContext, makeInput(buildFullJpeg()));
+    const raw = JSON.parse(result.getExifJson());
+    const leakedKeys = Object.keys(raw).filter((k) => k.startsWith('GPS') || k === 'latitude' || k === 'longitude');
+    expect(leakedKeys).toEqual([]);
+  });
+
   it('found=false (no error) for a JPEG with no EXIF block', async () => {
     const result = await extractExif(testContext, makeInput(buildBareJpeg()));
     expect(result.getError()).toBeUndefined();

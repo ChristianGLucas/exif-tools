@@ -113,18 +113,64 @@ export function padGpsTimeStamp(raw: string): string {
   return `${h.padStart(2, '0')}:${mi.padStart(2, '0')}:${secPadded}`;
 }
 
+/** exifr does not fully honor `gps:false` when `tiff`+`exif` are both true
+ * with `mergeOutput:true` — GPS tags (GPS*-prefixed keys, plus the derived
+ * `latitude`/`longitude`) leak into the merged result regardless. Strip
+ * them explicitly wherever a node's contract says "EXIF only" — GPS has its
+ * own dedicated ExtractGps node. */
+export function stripGpsKeys<T extends Record<string, unknown>>(obj: T): T {
+  const out: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k.startsWith('GPS') || k === 'latitude' || k === 'longitude') continue;
+    out[k] = v;
+  }
+  return out as T;
+}
+
+/** exifr's default silentErrors behavior means a truncated/malformed XMP
+ * segment does not throw — instead the "xmp" result object comes back
+ * containing only an internal `errors` array (e.g. `{errors: [...]}`)
+ * rather than any real parsed property. Left unfiltered, that reads as
+ * "XMP found" with a garbage payload. Strip the internal key and report
+ * whether the result was ONLY that error marker (i.e. not real data). */
+export function cleanXmpResult(xmp: unknown): { data: Record<string, unknown>; onlyErrors: boolean } {
+  if (!xmp || typeof xmp !== 'object') return { data: {}, onlyErrors: false };
+  const obj = xmp as Record<string, unknown>;
+  const hadErrorsKey = Object.prototype.hasOwnProperty.call(obj, 'errors');
+  const data: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(obj)) {
+    if (k === 'errors') continue;
+    data[k] = v;
+  }
+  return { data, onlyErrors: hadErrorsKey && Object.keys(data).length === 0 };
+}
+
 export function dateToIso(value: unknown): string {
   if (value instanceof Date && !isNaN(value.getTime())) return value.toISOString();
   if (typeof value === 'string') return value;
   return '';
 }
 
+const EXTENSION_FORMATS: Record<string, string> = {
+  jpg: 'jpeg', jpeg: 'jpeg',
+  png: 'png',
+  tif: 'tiff', tiff: 'tiff',
+  webp: 'webp',
+  gif: 'gif',
+  bmp: 'bmp',
+  heic: 'heic', heif: 'heif',
+  avif: 'avif',
+};
+
 /** Sniff the container format from magic bytes at the start of the buffer.
  * This is deliberately independent of exifr (which is a metadata parser,
  * not a general file-type sniffer) and only needs the same small header
- * prefix every node in this package already requires. Returns 'unknown'
- * rather than throwing on anything unrecognized. */
-export function sniffFormat(buf: Buffer): string {
+ * prefix every node in this package already requires. Magic bytes always
+ * take priority; `filename`'s extension is consulted ONLY as a fallback
+ * when the bytes alone are ambiguous ('unknown') — it is never used for
+ * file I/O, just a string comparison. Returns 'unknown' if neither the
+ * bytes nor the filename identify a known format. */
+export function sniffFormat(buf: Buffer, filename?: string): string {
   if (buf.length >= 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'jpeg';
   if (
     buf.length >= 8 &&
@@ -145,6 +191,13 @@ export function sniffFormat(buf: Buffer): string {
     if (brand.startsWith('avif') || brand.startsWith('avis')) return 'avif';
     if (brand.startsWith('heic') || brand.startsWith('heix') || brand.startsWith('hevc') || brand.startsWith('mif1') || brand.startsWith('heim') || brand.startsWith('heis')) return 'heic';
     return 'heif';
+  }
+  if (filename) {
+    const m = /\.([a-zA-Z0-9]+)$/.exec(filename.trim());
+    if (m) {
+      const ext = m[1].toLowerCase();
+      if (EXTENSION_FORMATS[ext]) return EXTENSION_FORMATS[ext];
+    }
   }
   return 'unknown';
 }

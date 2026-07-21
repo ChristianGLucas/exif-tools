@@ -27,7 +27,7 @@ export async function getImageInfo(ax: AxiomContext, input: ImageBytes): Promise
     return out;
   }
 
-  const format = sniffFormat(safe.buffer);
+  const format = sniffFormat(safe.buffer, input.getFilename());
   out.setFormat(format);
 
   try {

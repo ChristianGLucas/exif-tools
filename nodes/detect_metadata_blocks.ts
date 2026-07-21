@@ -1,7 +1,7 @@
 import exifr from 'exifr';
 import { ImageBytes, BlockPresence } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { toSafeBuffer, classifyParseError, sniffFormat } from './lib';
+import { toSafeBuffer, classifyParseError, sniffFormat, cleanXmpResult } from './lib';
 
 /**
  * Fast presence check for every metadata block type this package can
@@ -24,7 +24,7 @@ export async function detectMetadataBlocks(ax: AxiomContext, input: ImageBytes):
     return out;
   }
 
-  out.setDetectedFormat(sniffFormat(safe.buffer));
+  out.setDetectedFormat(sniffFormat(safe.buffer, input.getFilename()));
 
   try {
     // exifr flattens XMP's namespace properties (dc, photoshop, ...) into
@@ -61,7 +61,11 @@ export async function detectMetadataBlocks(ax: AxiomContext, input: ImageBytes):
     out.setHasExif(exifPresent);
     out.setHasGps(Boolean(main?.gps && Object.keys(main.gps).length > 0));
     out.setHasIptc(Boolean(main?.iptc && Object.keys(main.iptc).length > 0));
-    out.setHasXmp(Boolean(xmp && Object.keys(xmp).length > 0));
+    // exifr's default silentErrors behavior means a truncated/malformed XMP
+    // segment comes back as {errors: [...]} instead of throwing — that must
+    // not be mistaken for "XMP present".
+    const { data: xmpData, onlyErrors: xmpOnlyErrors } = cleanXmpResult(xmp);
+    out.setHasXmp(!xmpOnlyErrors && Object.keys(xmpData).length > 0);
     out.setHasIcc(Boolean(main?.icc && Object.keys(main.icc).length > 0));
     out.setHasThumbnail(Boolean(main?.ifd1 && Object.keys(main.ifd1).length > 0));
   } catch (e) {

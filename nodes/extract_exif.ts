@@ -1,7 +1,7 @@
 import exifr from 'exifr';
 import { ImageBytes, ExifData } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { toSafeBuffer, classifyParseError, toJsonString, formatExposureTime, dateToIso } from './lib';
+import { toSafeBuffer, classifyParseError, toJsonString, formatExposureTime, dateToIso, stripGpsKeys } from './lib';
 
 /**
  * Extract the EXIF/TIFF camera & exposure tags — Make, Model, LensModel,
@@ -24,7 +24,7 @@ export async function extractExif(ax: AxiomContext, input: ImageBytes): Promise<
   }
 
   try {
-    const result: any = await exifr.parse(safe.buffer, {
+    const raw: any = await exifr.parse(safe.buffer, {
       tiff: true,
       exif: true,
       gps: false,
@@ -39,6 +39,11 @@ export async function extractExif(ax: AxiomContext, input: ImageBytes): Promise<
       // otherwise silently replace the raw 1-8 code this node promises.
       translateValues: false,
     });
+
+    // exifr does not fully honor gps:false in this option combination —
+    // GPS tags leak into the merged result regardless. This node is
+    // EXIF-only by contract (see ExtractGps), so strip them explicitly.
+    const result = raw ? stripGpsKeys(raw) : raw;
 
     if (!result || Object.keys(result).length === 0) {
       out.setFound(false);

@@ -1,7 +1,7 @@
 import exifr from 'exifr';
 import { ImageBytes, ParseAllOutput } from '../gen/messages_pb';
 import { AxiomContext } from '../gen/axiomContext';
-import { toSafeBuffer, classifyParseError, toJsonString } from './lib';
+import { toSafeBuffer, classifyParseError, toJsonString, cleanXmpResult } from './lib';
 
 /**
  * Parse every metadata block exifr can find in an image's header bytes —
@@ -43,6 +43,10 @@ export async function parseAll(ax: AxiomContext, input: ImageBytes): Promise<Par
         ifd1: true,
         mergeOutput: false,
         sanitize: true,
+        // Raw tag values, not human-readable translations (e.g. Orientation
+        // as 6, not "Rotate 90 CW") — this field is documented as the raw
+        // tag set, and ExtractExif already makes the same choice.
+        translateValues: false,
       }),
       exifr.parse(safe.buffer, {
         tiff: false,
@@ -53,6 +57,11 @@ export async function parseAll(ax: AxiomContext, input: ImageBytes): Promise<Par
         sanitize: true,
       }),
     ]);
+
+    // exifr's default silentErrors behavior means a truncated/malformed XMP
+    // segment comes back as {errors: [...]} instead of throwing or being
+    // empty — strip that internal marker so it isn't mistaken for real data.
+    const { data: xmpData, onlyErrors: xmpOnlyErrors } = cleanXmpResult(xmp);
 
     const blocksPresent: string[] = [];
 
@@ -69,9 +78,9 @@ export async function parseAll(ax: AxiomContext, input: ImageBytes): Promise<Par
       blocksPresent.push('iptc');
       out.setIptcJson(toJsonString(main.iptc));
     }
-    if (xmp && Object.keys(xmp).length > 0) {
+    if (!xmpOnlyErrors && Object.keys(xmpData).length > 0) {
       blocksPresent.push('xmp');
-      out.setXmpJson(toJsonString(xmp));
+      out.setXmpJson(toJsonString(xmpData));
     }
     if (main?.icc) {
       blocksPresent.push('icc');

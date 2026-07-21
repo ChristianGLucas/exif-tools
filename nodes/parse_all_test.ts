@@ -30,6 +30,23 @@ describe('ParseAll', () => {
     const xmp = JSON.parse(result.getXmpJson());
     expect(xmp).toBeTruthy();
     expect(JSON.stringify(xmp)).toContain('Test Author');
+
+    // Regression: exif_json must carry the RAW numeric orientation (6), not
+    // exifr's human-readable translation ("Rotate 90 CW") — this field is
+    // documented as the raw tag set, and consistency with ExtractExif
+    // (which already gets this right) matters. Found by independent review.
+    expect(exif.Orientation).toBe(6);
+  });
+
+  it('never leaks a GPS/errors-fabricated xmp block, and reports found_any=false for a truncated XMP segment (regression)', async () => {
+    // Same silentErrors issue as ExtractXmp: a truncated XMP segment comes
+    // back from exifr as {errors:[...]}, which must not be reported as a
+    // present "xmp" block.
+    const full = buildFullJpeg();
+    const truncated = full.subarray(0, Math.floor(full.length * 0.5));
+    const result = await parseAll(testContext, makeInput(truncated));
+    expect(result.getBlocksPresentList()).not.toContain('xmp');
+    expect(result.getXmpJson()).toBe('');
   });
 
   it('reports found_any=false (no error) for a JPEG with no metadata', async () => {
