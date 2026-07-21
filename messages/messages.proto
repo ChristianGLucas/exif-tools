@@ -1,0 +1,291 @@
+// This file defines the data contracts (messages) for your Axiom package.
+// Every node's --input and --output refers to a message defined here.
+//
+// Run `axiom create message <Name>` to scaffold a new message below.
+// Run `axiom generate` to compile these definitions into language bindings in gen/.
+//
+// DOCUMENTATION
+//   Comments written directly above a message or field declaration are extracted
+//   automatically at publish time and shown in the Axiom registry as documentation.
+//   Write your descriptions there — no separate doc files needed.
+//
+//   Leading comment  (no blank line before the declaration) → registry description ✓
+//   Detached comment (blank line before the declaration)    → ignored by registry  ✗
+//
+// This file is yours to edit. Axiom only appends new message blocks — it never
+// overwrites or removes content you have written.
+
+syntax = "proto3";
+
+package christiangeorgelucas.exif_tools;
+
+// Canonical input envelope for every node in this package: the leading bytes
+// of an image file. EXIF/IPTC/XMP/ICC metadata segments live in the file
+// HEADER, not scattered through the pixel data, so a full photo is rarely
+// needed — the first 64 KB-1 MB of the file is almost always enough. Callers
+// should send the smallest prefix of the file that is likely to contain the
+// metadata they need, both because it's cheaper and because a single Axiom
+// node message is capped at ~4 MiB; this package additionally rejects any
+// input over ~3 MiB with a structured INPUT_TOO_LARGE error rather than
+// truncating silently. There is no `url` field anywhere in this package —
+// nodes never fetch over the network; the caller must always supply bytes
+// directly.
+message ImageBytes {
+  // Raw image bytes, base64-encoded over the JSON bridge. Should contain at
+  // least the leading header region containing the metadata segments; does
+  // not need to be the complete file. Rejected above ~3 MiB (3,145,728 bytes).
+  bytes data = 1;
+  // Optional filename hint (e.g. "photo.jpg"). Used only to help format
+  // sniffing when the header bytes alone are ambiguous; never used for file
+  // I/O and never required.
+  string filename = 2;
+}
+
+// A structured, machine-readable error returned instead of throwing when an
+// input can't be parsed. Every node in this package returns this shape on
+// failure rather than crashing.
+message MetadataError {
+  // Stable machine-readable code: NO_METADATA_FOUND, TRUNCATED_INPUT,
+  // MALFORMED_IMAGE, INPUT_TOO_LARGE, UNSUPPORTED_FORMAT, EMPTY_INPUT.
+  string code = 1;
+  // Human-readable detail, safe to show to a caller.
+  string message = 2;
+}
+
+// Output of ParseAll: every metadata block exifr found, each as a JSON
+// object serialized to a string (the tag sets are heterogeneous and
+// open-ended, so a JSON string is the honest structured representation
+// rather than forcing them into a fixed proto shape). Empty string means
+// that block was not present.
+message ParseAllOutput {
+  // True if at least one metadata block was found.
+  bool found_any = 1;
+  // Set only when parsing failed entirely (e.g. not a recognizable image).
+  // Individual missing blocks are represented by an empty *_json field, not
+  // by this error.
+  MetadataError error = 2;
+  // Which blocks were found: any of "exif", "gps", "iptc", "xmp", "icc",
+  // "thumbnail".
+  repeated string blocks_present = 3;
+  // EXIF/TIFF tag set as a JSON object string. Empty if not present.
+  string exif_json = 4;
+  // GPS tag set as a JSON object string (raw tags, not decoded decimal —
+  // use ExtractGps for decoded lat/lon). Empty if not present.
+  string gps_json = 5;
+  // IPTC tag set as a JSON object string. Empty if not present.
+  string iptc_json = 6;
+  // XMP tag set as a JSON object string. Empty if not present.
+  string xmp_json = 7;
+  // ICC profile summary as a JSON object string. Empty if not present.
+  string icc_json = 8;
+}
+
+// Output of ExtractExif: the common camera/exposure EXIF & TIFF tags as
+// typed fields, plus the full raw EXIF tag set for anything not promoted to
+// a typed field.
+message ExifData {
+  // True if an EXIF/TIFF block was found.
+  bool found = 1;
+  MetadataError error = 2;
+  string make = 3;
+  string model = 4;
+  string software = 5;
+  string lens_model = 6;
+  // Exposure time in seconds (e.g. 0.002 for 1/500s). 0 if not present.
+  double exposure_time = 7;
+  // Human-formatted exposure time (e.g. "1/500").
+  string exposure_time_formatted = 8;
+  // Aperture as an f-number (e.g. 2.8 for f/2.8). 0 if not present.
+  double f_number = 9;
+  // ISO speed rating. 0 if not present.
+  int32 iso = 10;
+  double focal_length_mm = 11;
+  // 35mm-equivalent focal length, if the camera reports it. 0 if not present.
+  double focal_length_35mm_mm = 12;
+  // Raw EXIF orientation tag, 1-8. 0 if not present (see GetOrientation for
+  // the decoded rotation/flip meaning).
+  int32 orientation = 13;
+  // ISO 8601 timestamp when available, otherwise the raw EXIF date string.
+  string date_time_original = 14;
+  string date_time_digitized = 15;
+  string date_time = 16;
+  string color_space = 17;
+  // Pixel dimensions as recorded in the EXIF block itself (ExifImageWidth/
+  // Height), which can differ from the file's actual encoded dimensions.
+  int32 exif_image_width = 18;
+  int32 exif_image_height = 19;
+  // The complete raw EXIF/TIFF tag set as a JSON object string, including
+  // tags not promoted to a field above.
+  string exif_json = 20;
+}
+
+// Output of ExtractGps: the GPS block decoded into a single decimal
+// lat/lon/altitude, independent of the raw sexagesimal EXIF GPS tags.
+message GpsData {
+  // True if a GPS block with usable coordinates was found.
+  bool found = 1;
+  MetadataError error = 2;
+  // Signed decimal degrees (negative = South / West). Only meaningful when
+  // `found` is true.
+  double latitude = 3;
+  double longitude = 4;
+  bool has_altitude = 5;
+  // Meters above (positive) or below (negative, per GPSAltitudeRef) sea level.
+  double altitude_meters = 6;
+  bool has_speed = 7;
+  // Ground speed, in the unit named by speed_ref ("K" km/h, "M" mph, "N" knots).
+  double speed = 8;
+  string speed_ref = 9;
+  bool has_direction = 10;
+  // Direction of travel/image capture in degrees (0-359.99), true or magnetic
+  // north per direction_ref ("T" true, "M" magnetic).
+  double direction_degrees = 11;
+  string direction_ref = 12;
+  // GPS timestamp (UTC) as ISO 8601, if the GPS block carries one.
+  string timestamp = 13;
+  // The raw GPS tag set as a JSON object string.
+  string gps_json = 14;
+}
+
+// Output of ExtractIptc: the IPTC-IIM caption/credit/keyword fields most
+// commonly used for photo cataloging and rights attribution.
+message IptcData {
+  bool found = 1;
+  MetadataError error = 2;
+  string caption = 3;
+  repeated string keywords = 4;
+  string byline = 5;
+  string byline_title = 6;
+  string credit = 7;
+  string source = 8;
+  string copyright_notice = 9;
+  string headline = 10;
+  string city = 11;
+  string state = 12;
+  string country = 13;
+  string category = 14;
+  repeated string supplemental_categories = 15;
+  string object_name = 16;
+  string special_instructions = 17;
+  // The complete raw IPTC tag set as a JSON object string.
+  string iptc_json = 18;
+}
+
+// Output of ExtractXmp: the XMP/RDF packet, parsed into a structured JSON
+// object string (XMP's own data model is open-ended RDF, so JSON is the
+// honest structured representation rather than a fixed proto shape). XMP is
+// parsed as data only — this package never resolves external entities or
+// follows any URL/reference an XMP packet may contain.
+message XmpData {
+  bool found = 1;
+  MetadataError error = 2;
+  // The parsed XMP properties as a JSON object string.
+  string xmp_json = 3;
+}
+
+// Output of GetOrientation: the raw EXIF orientation tag (1-8) decoded into
+// the concrete rotation + flip a viewer must apply to display the image
+// upright.
+message OrientationInfo {
+  // True if an explicit orientation tag was found. When false, `orientation`
+  // is still populated as 1 (the EXIF-default "normal", no rotation) per
+  // spec, but that default was not asserted by the file itself.
+  bool found = 1;
+  MetadataError error = 2;
+  // Raw EXIF orientation value, 1-8.
+  int32 orientation = 3;
+  // Degrees to rotate clockwise for correct display: one of 0, 90, 180, 270.
+  int32 rotation_degrees = 4;
+  // Whether a horizontal mirror must also be applied (before rotation).
+  bool flip_horizontal = 5;
+  // Whether a vertical mirror must also be applied (before rotation).
+  bool flip_vertical = 6;
+  // Human-readable description, e.g. "Mirror horizontal and rotate 270 CW".
+  string description = 7;
+}
+
+// Output of ExtractTimestamps: every capture/modification timestamp EXIF
+// and GPS can carry, gathered in one place.
+message TimestampData {
+  bool found = 1;
+  MetadataError error = 2;
+  // When the picture was actually taken (EXIF DateTimeOriginal + SubSec).
+  string date_time_original = 3;
+  // When the image was digitized/scanned (EXIF DateTimeDigitized).
+  string date_time_digitized = 4;
+  // When the file was last modified (EXIF DateTime / ModifyDate).
+  string date_time_modified = 5;
+  // GPS timestamp (UTC), if present — often the most reliable clock since
+  // it comes from satellite time rather than the camera's own clock.
+  string gps_timestamp = 6;
+}
+
+// Output of ExtractCameraInfo: a normalized camera/lens identity summary.
+message CameraInfo {
+  bool found = 1;
+  MetadataError error = 2;
+  string make = 3;
+  string model = 4;
+  string lens_make = 5;
+  string lens_model = 6;
+  string software = 7;
+  // Camera body serial number, if the file carries one (rare, and PII-like —
+  // callers should treat it accordingly).
+  string body_serial_number = 8;
+  // Human-readable "<make> <model>" (+ " + <lens>" if a lens is identified).
+  string summary = 9;
+}
+
+// Output of DetectMetadataBlocks: a fast presence check for each metadata
+// block, without decoding any of their contents — use this to decide which
+// of the more specific Extract* nodes are worth calling.
+message BlockPresence {
+  MetadataError error = 1;
+  bool has_exif = 2;
+  bool has_gps = 3;
+  bool has_iptc = 4;
+  bool has_xmp = 5;
+  bool has_icc = 6;
+  bool has_thumbnail = 7;
+  // Sniffed container format, e.g. "jpeg", "tiff", "png", "webp", "heic".
+  string detected_format = 8;
+}
+
+// Output of GetImageInfo: basic image dimensions/format read from the file
+// header — no pixel decoding, just the header fields the container format
+// itself records.
+message ImageInfo {
+  bool found = 1;
+  MetadataError error = 2;
+  int32 width = 3;
+  int32 height = 4;
+  // Sniffed container format, e.g. "jpeg", "tiff", "png", "webp", "heic".
+  string format = 5;
+  // Bits per color channel, when the header records it (0 if unknown).
+  int32 bit_depth = 6;
+}
+
+// Output of ExtractThumbnailInfo: metadata ABOUT an embedded EXIF thumbnail
+// (its dimensions, encoding and location within the header) without
+// returning the thumbnail's own bytes, which would work against the same
+// size budget this package is designed to stay under.
+message ThumbnailInfo {
+  // True if the file's EXIF/TIFF block declares an embedded thumbnail.
+  bool found = 1;
+  MetadataError error = 2;
+  int32 width = 3;
+  int32 height = 4;
+  // Thumbnail encoding, typically "JPEG".
+  string format = 5;
+  // Size of the embedded thumbnail in bytes, as declared by the EXIF
+  // ThumbnailLength tag.
+  int32 byte_length = 6;
+  // Byte offset of the thumbnail within the SUPPLIED input buffer (not
+  // necessarily the original file, if the caller sent a truncated prefix).
+  // -1 if the offset could not be determined from the supplied bytes.
+  int32 offset_in_input = 7;
+  // True if the thumbnail's bytes are fully contained within the bytes the
+  // caller supplied (offset_in_input + byte_length <= len(data)) — i.e.
+  // whether a follow-up call with the same input could actually extract it.
+  bool bytes_available_in_input = 8;
+}

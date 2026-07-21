@@ -1,0 +1,49 @@
+name: christiangeorgelucas/exif-tools
+version: 0.1.0
+language: typescript
+description: Deterministic extraction of embedded metadata from image files - EXIF/TIFF, IPTC-IIM, XMP, ICC, and GPS - wrapping exifr (MIT, pure JS, zero runtime dependencies) - the fastest and most complete JS EXIF/metadata reader, notable for parsing directly from a truncated buffer containing just the file header instead of requiring the whole image. This package only READS metadata; it never touches, decodes, or transforms pixel data (see christiangeorgelucas/image-tools and christiangeorgelucas/opencv-tools for pixel operations). Every node takes the SAME canonical ImageBytes envelope - the caller-supplied leading bytes of the image file, since EXIF/IPTC/XMP/ICC segments live in the file header - and every node rejects input over ~3 MiB with a structured INPUT_TOO_LARGE error (Axiom's node transport caps a single message at ~4 MiB, and metadata almost never needs a whole multi-MB photo - send the first 64 KB-1 MB of the file). There is no `url` field anywhere and no node ever fetches over the network or touches the filesystem - callers must always supply bytes directly - and XMP (which is RDF/XML) is parsed via exifr's own minimal, dependency-free reader that has no DTD/entity support at all, so there is no XXE surface. A malformed, truncated, or metadata-free image returns a structured error/found=false, never a crash.
+nodes:
+    - name: ParseAll
+      input: ImageBytes
+      output: ParseAllOutput
+      description: Parse every metadata block exifr can find - EXIF/TIFF, GPS, IPTC, XMP, and ICC - into one structured object, each block returned as a JSON-object string (the tag sets are open-ended and heterogeneous, so JSON is the honest structured representation). found_any=false with no error means the input parsed as a valid image but carried no recognized metadata segment. For a single well-known block, prefer the more specific ExtractExif/ExtractGps/ExtractIptc/ExtractXmp nodes, which decode common tags into typed fields instead of a JSON blob.
+    - name: ExtractExif
+      input: ImageBytes
+      output: ExifData
+      description: Extract the EXIF/TIFF camera and exposure tags - Make, Model, LensModel, Software, ExposureTime (+ human-formatted, e.g. "1/500"), FNumber, ISO, FocalLength (+ 35mm-equivalent), Orientation, DateTimeOriginal/DateTimeDigitized/DateTime, ColorSpace, and the EXIF-recorded pixel dimensions - as typed fields, plus the complete raw EXIF/TIFF tag set as a JSON string for anything not promoted to a field. found=false (no error) means the image carried no EXIF/TIFF block at all - common for PNGs, screenshots, and web-re-encoded photos.
+    - name: ExtractGps
+      input: ImageBytes
+      output: GpsData
+      description: Extract the GPS block and return DECODED decimal latitude/longitude (signed degrees, negative = South/West), plus altitude, ground speed, direction of travel, and GPS timestamp (UTC) when present - independent of the raw sexagesimal (degrees/minutes/seconds) EXIF GPS tags. found=false (no error) is the common case - most photos carry no GPS block at all.
+    - name: ExtractIptc
+      input: ImageBytes
+      output: IptcData
+      description: Extract the IPTC-IIM photo-cataloging and rights-attribution fields used by news/stock-photo/DAM workflows - Caption, Keywords, Byline (+ BylineTitle), Credit, Source, CopyrightNotice, Headline, City/State/Country, Category (+ SupplementalCategories), ObjectName, SpecialInstructions - as typed fields, plus the complete raw IPTC tag set as a JSON string. found=false (no error) means no IPTC block was present - it's written by editorial/DAM tools (Photoshop, digiKam, news-wire software), not by cameras.
+    - name: ExtractXmp
+      input: ImageBytes
+      output: XmpData
+      description: Extract the XMP packet (Adobe's RDF/XML metadata format) into a structured JSON object - XMP's own data model is open-ended RDF, so JSON is the honest structured representation rather than a fixed proto shape. Parsed as data only - never resolves external XML entities and never follows any URL/reference an XMP packet may contain (no XXE, no SSRF); exifr's XMP parser is a minimal, dependency-free reader with no DTD/entity support at all. found=false (no error) means no XMP packet was present.
+    - name: GetOrientation
+      input: ImageBytes
+      output: OrientationInfo
+      description: Extract the raw EXIF orientation tag (1-8) and decode it into the concrete rotation (clockwise degrees - one of 0/90/180/270) and mirroring a viewer must apply to display the image upright, per the standard EXIF Orientation table. found=false means no orientation tag was present; the output still reports orientation=1/rotation_degrees=0/no flip since that IS the EXIF-defined default meaning of "absent" - but note that default was not actually asserted by the file.
+    - name: ExtractTimestamps
+      input: ImageBytes
+      output: TimestampData
+      description: Gather every capture/modification timestamp EXIF and GPS can carry into one place - DateTimeOriginal (when the picture was actually taken), CreateDate/DateTimeDigitized, ModifyDate (last file modification per EXIF), and the GPS timestamp (UTC, from satellite time - often the most reliable of the four since it doesn't depend on the camera's own clock). found=false means none were present.
+    - name: ExtractCameraInfo
+      input: ImageBytes
+      output: CameraInfo
+      description: Extract a normalized camera/lens identity summary - Make, Model, LensMake, LensModel, Software, and (when present - PII-like, treat accordingly) the camera body's SerialNumber - plus a human-readable one-line summary ("<make> <model>" with " + <lens>" appended when a lens is identified). found=false means neither a Make nor a Model was present.
+    - name: DetectMetadataBlocks
+      input: ImageBytes
+      output: BlockPresence
+      description: Fast presence check for every metadata block type this package can extract (EXIF, GPS, IPTC, XMP, ICC, embedded thumbnail) plus the sniffed container format (jpeg/png/tiff/webp/heic/gif/bmp/unknown), without decoding any block's contents - use this to decide which of the more specific Extract* nodes are worth calling. An error is only set when the input can't be parsed as an image at all; every has_* field being false is a normal, valid result.
+    - name: GetImageInfo
+      input: ImageBytes
+      output: ImageInfo
+      description: Basic image dimensions/format read directly from the file header's own structural fields - no pixel decoding. For PNG this is the exact IHDR chunk (authoritative). For JPEG/TIFF this is the EXIF-recorded PixelXDimension/PixelYDimension or native TIFF ImageWidth/ImageHeight tags - reliable for camera-original files, but these are metadata fields, not a re-measurement of the actual encoded pixels. found=false means no dimensions could be read from the header (e.g. WEBP/GIF/BMP, for which this package only sniffs the format, not dimensions).
+    - name: ExtractThumbnailInfo
+      input: ImageBytes
+      output: ThumbnailInfo
+      description: Report metadata ABOUT an embedded EXIF thumbnail - pixel dimensions, encoding, and declared byte length - WITHOUT returning the thumbnail's own bytes, which would work against this package's ~3 MiB input budget. found=false means the file's EXIF/TIFF block declares no embedded thumbnail. offset_in_input/bytes_available_in_input are only computable when the caller's buffer is a raw .tiff file (TIFF header at byte 0); for JPEG's APP1-wrapped TIFF payload the segment's own start offset isn't part of exifr's stable public output, so offset_in_input is reported as -1 rather than guessed.
