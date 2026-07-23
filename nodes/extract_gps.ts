@@ -10,8 +10,7 @@ import { toSafeBuffer, classifyParseError, toJsonString, padGpsTimeStamp } from 
  * (degrees/minutes/seconds) EXIF GPS tags. found=false (with no error)
  * means the image parsed but carried no usable GPS coordinates — this is
  * the common case for the large majority of photos, which have no GPS
- * block at all. Input must be the image's leading header bytes, capped at
- * ~3 MiB.
+ * block at all. Input must be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

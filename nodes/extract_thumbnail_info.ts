@@ -13,18 +13,16 @@ function compressionToFormat(code: unknown): string {
 /**
  * Report metadata ABOUT an embedded EXIF thumbnail — its pixel dimensions,
  * encoding, and declared byte length — WITHOUT returning the thumbnail's
- * own bytes (which would work against the same ~3 MiB input budget this
- * whole package is designed to stay under; use exifr's own
- * `exifr.thumbnail()` directly if you actually need the bytes and can
- * afford to send more of the file). found=false means the file's EXIF/TIFF
- * block declares no embedded thumbnail (most non-JPEG files, and many
- * software-re-encoded JPEGs). `offset_in_input`/`bytes_available_in_input`
- * are only computable when the caller's buffer IS a raw .tiff file (where
- * the TIFF header starts at byte 0); for JPEG's APP1-wrapped TIFF payload,
- * the TIFF segment's own start offset within the file isn't part of
- * exifr's stable public output, so offset_in_input is reported as -1
- * rather than guessed. Input must be the image's leading header bytes,
- * capped at ~3 MiB.
+ * own bytes (this package only reads metadata, never pixel/image data; use
+ * exifr's own `exifr.thumbnail()` directly if you actually need the
+ * bytes). found=false means the file's EXIF/TIFF block declares no
+ * embedded thumbnail (most non-JPEG files, and many software-re-encoded
+ * JPEGs). `offset_in_input`/`bytes_available_in_input` are only computable
+ * when the caller's buffer IS a raw .tiff file (where the TIFF header
+ * starts at byte 0); for JPEG's APP1-wrapped TIFF payload, the TIFF
+ * segment's own start offset within the file isn't part of exifr's stable
+ * public output, so offset_in_input is reported as -1 rather than guessed.
+ * Input must be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

@@ -11,7 +11,7 @@ import { toSafeBuffer, classifyParseError, toJsonString, formatExposureTime, dat
  * EXIF/TIFF tag set as a JSON string for anything not promoted to a field.
  * found=false with no error means the image parsed but carried no EXIF/TIFF
  * block at all (common for PNGs/screenshots/web-re-encoded photos). Input
- * must be the image's leading header bytes, capped at ~3 MiB.
+ * must be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

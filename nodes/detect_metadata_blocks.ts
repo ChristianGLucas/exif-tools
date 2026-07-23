@@ -12,7 +12,7 @@ import { toSafeBuffer, classifyParseError, sniffFormat, cleanXmpResult } from '.
  * error is only set when the input can't be parsed as an image at all;
  * every has_* field simply being false is a normal, valid result (most
  * images have no GPS/IPTC block, for instance). Input must be the image's
- * leading header bytes, capped at ~3 MiB.
+ * leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

@@ -69,9 +69,4 @@ describe('ExtractExif', () => {
     const result = await extractExif(testContext, makeInput(Buffer.alloc(0)));
     expect(result.getError()?.getCode()).toBe('EMPTY_INPUT');
   });
-
-  it('rejects oversized input with INPUT_TOO_LARGE', async () => {
-    const result = await extractExif(testContext, makeInput(Buffer.alloc(3 * 1024 * 1024 + 100)));
-    expect(result.getError()?.getCode()).toBe('INPUT_TOO_LARGE');
-  });
 });

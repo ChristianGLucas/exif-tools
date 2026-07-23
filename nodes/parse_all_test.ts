@@ -73,13 +73,6 @@ describe('ParseAll', () => {
     expect(result.getError()!.getCode()).toBe('EMPTY_INPUT');
   });
 
-  it('returns INPUT_TOO_LARGE for input over the 3 MiB cap, without attempting to parse it', async () => {
-    const oversized = Buffer.alloc(3 * 1024 * 1024 + 1);
-    const result = await parseAll(testContext, makeInput(oversized));
-    expect(result.getError()).toBeDefined();
-    expect(result.getError()!.getCode()).toBe('INPUT_TOO_LARGE');
-  });
-
   it('returns a structured error for garbage bytes rather than crashing', async () => {
     const garbage = Buffer.from('not an image, just some plain text bytes padded out'.repeat(50));
     const result = await parseAll(testContext, makeInput(garbage));

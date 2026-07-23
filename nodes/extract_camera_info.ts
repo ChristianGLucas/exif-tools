@@ -10,7 +10,7 @@ import { toSafeBuffer, classifyParseError } from './lib';
  * SerialNumber, plus a human-readable one-line summary ("<make> <model>"
  * with " + <lens>" appended when a lens is identified). found=false means
  * neither a camera Make nor Model was present. Input must be the image's
- * leading header bytes, capped at ~3 MiB.
+ * leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

@@ -24,16 +24,14 @@ package christiangeorgelucas.exif_tools;
 // HEADER, not scattered through the pixel data, so a full photo is rarely
 // needed — the first 64 KB-1 MB of the file is almost always enough. Callers
 // should send the smallest prefix of the file that is likely to contain the
-// metadata they need, both because it's cheaper and because a single Axiom
-// node message is capped at ~4 MiB; this package additionally rejects any
-// input over ~3 MiB with a structured INPUT_TOO_LARGE error rather than
-// truncating silently. There is no `url` field anywhere in this package —
-// nodes never fetch over the network; the caller must always supply bytes
-// directly.
+// metadata they need, since it's cheaper and metadata parsing gets no benefit
+// from the rest of the file. There is no `url` field anywhere in this
+// package — nodes never fetch over the network; the caller must always
+// supply bytes directly.
 message ImageBytes {
   // Raw image bytes, base64-encoded over the JSON bridge. Should contain at
   // least the leading header region containing the metadata segments; does
-  // not need to be the complete file. Rejected above ~3 MiB (3,145,728 bytes).
+  // not need to be the complete file.
   bytes data = 1;
   // Optional filename hint (e.g. "photo.jpg"). Used only to help format
   // sniffing when the header bytes alone are ambiguous; never used for file
@@ -46,7 +44,7 @@ message ImageBytes {
 // failure rather than crashing.
 message MetadataError {
   // Stable machine-readable code: NO_METADATA_FOUND, TRUNCATED_INPUT,
-  // MALFORMED_IMAGE, INPUT_TOO_LARGE, UNSUPPORTED_FORMAT, EMPTY_INPUT.
+  // MALFORMED_IMAGE, UNSUPPORTED_FORMAT, EMPTY_INPUT.
   string code = 1;
   // Human-readable detail, safe to show to a caller.
   string message = 2;
@@ -267,8 +265,9 @@ message ImageInfo {
 
 // Output of ExtractThumbnailInfo: metadata ABOUT an embedded EXIF thumbnail
 // (its dimensions, encoding and location within the header) without
-// returning the thumbnail's own bytes, which would work against the same
-// size budget this package is designed to stay under.
+// returning the thumbnail's own bytes — this package only reads metadata,
+// never pixel/image data; use exifr's own `exifr.thumbnail()` directly if
+// you need the thumbnail's actual bytes.
 message ThumbnailInfo {
   // True if the file's EXIF/TIFF block declares an embedded thumbnail.
   bool found = 1;

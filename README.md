@@ -32,8 +32,7 @@ See [`image-tools`](https://github.com/ChristianGLucas/image-tools) and
 
 Every node takes the same `ImageBytes` envelope — the caller-supplied **leading bytes** of an
 image file. EXIF/IPTC/XMP/ICC segments live in the file header, so a full photo is rarely
-needed: send the first 64 KB–1 MB of the file. Input over ~3 MiB is rejected with a structured
-`INPUT_TOO_LARGE` error (Axiom's node transport caps a single message at ~4 MiB).
+needed: send the first 64 KB–1 MB of the file.
 
 No node ever fetches over the network or touches the filesystem — bytes must always be
 supplied directly by the caller. XMP (RDF/XML) is parsed via exifr's own minimal,

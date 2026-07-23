@@ -17,7 +17,7 @@ import { toSafeBuffer, classifyParseError, toJsonString, cleanXmpResult } from '
  * rather than throwing, so a truncated packet is indistinguishable from
  * absence at this node's contract level; ParseAll's overall parse would
  * still separately fail if the WHOLE input were unparseable). Input must
- * be the image's leading header bytes, capped at ~3 MiB.
+ * be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

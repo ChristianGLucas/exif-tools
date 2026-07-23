@@ -18,7 +18,7 @@ function asStringList(value: unknown): string[] {
  * set as a JSON string. found=false (no error) means the image parsed but
  * carried no IPTC block — most photos don't have one; it's populated by
  * editorial/DAM tools (Photoshop, digiKam, news wire software), not
- * cameras. Input must be the image's leading header bytes, capped at ~3 MiB.
+ * cameras. Input must be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

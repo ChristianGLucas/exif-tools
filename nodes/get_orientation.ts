@@ -28,7 +28,7 @@ const ORIENTATION_TABLE: Record<number, { deg: number; flipH: boolean; flipV: bo
  * output still reports orientation=1 (rotation_degrees=0, no flip) since
  * that IS the EXIF-defined default meaning of "absent", but note that
  * default was not actually asserted by the file. Input must be the image's
- * leading header bytes, capped at ~3 MiB.
+ * leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

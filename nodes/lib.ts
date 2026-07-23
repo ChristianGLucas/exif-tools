@@ -14,15 +14,6 @@
 
 import { ImageBytes, MetadataError } from '../gen/messages_pb';
 
-/** Hard cap on accepted input size. Axiom's node transport caps a single
- * message at ~4 MiB; we reject above 3 MiB (3,145,728 bytes) so there is
- * headroom for the rest of the envelope and so a caller gets a clear,
- * structured reason instead of a transport-level failure. EXIF/IPTC/XMP/ICC
- * segments live in the file HEADER, so the caller is expected to send a
- * leading prefix of the file, not the whole photo — see ImageBytes's doc
- * comment in messages.proto. */
-export const MAX_INPUT_BYTES = 3 * 1024 * 1024;
-
 export function newError(code: string, message: string): MetadataError {
   const err = new MetadataError();
   err.setCode(code);
@@ -40,15 +31,6 @@ export function toSafeBuffer(input: ImageBytes): SafeBufferResult {
   const bytes = input.getData_asU8();
   if (!bytes || bytes.length === 0) {
     return { ok: false, error: newError('EMPTY_INPUT', 'data is empty — supply at least the leading header bytes of the image file') };
-  }
-  if (bytes.length > MAX_INPUT_BYTES) {
-    return {
-      ok: false,
-      error: newError(
-        'INPUT_TOO_LARGE',
-        `data is ${bytes.length} bytes, exceeding the ${MAX_INPUT_BYTES}-byte cap; metadata segments live in the file header, so send a smaller leading prefix of the file rather than the whole image`
-      ),
-    };
   }
   return { ok: true, buffer: Buffer.from(bytes) };
 }

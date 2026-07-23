@@ -15,7 +15,7 @@ import { toSafeBuffer, classifyParseError, sniffFormat } from './lib';
  * the header at all (e.g. WEBP/GIF/BMP, which this package does not carry
  * a dedicated header parser for beyond format sniffing — detected_format is
  * still set via DetectMetadataBlocks in that case). Input must be the
- * image's leading header bytes, capped at ~3 MiB.
+ * image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */

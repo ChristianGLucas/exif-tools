@@ -12,8 +12,8 @@ import { toSafeBuffer, classifyParseError, toJsonString, cleanXmpResult } from '
  * from blocks_present. For a single well-known block, prefer the more
  * specific ExtractExif/ExtractGps/ExtractIptc/ExtractXmp nodes, which
  * decode common tags into typed fields. Input must be the leading header
- * bytes of the image (no network fetch, no full-file requirement), capped
- * at ~3 MiB. found_any=false with no error means the input parsed as a
+ * bytes of the image (no network fetch, no full-file requirement).
+ * found_any=false with no error means the input parsed as a
  * valid image but carried no recognized metadata segment.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
@@ -31,7 +31,7 @@ export async function parseAll(ax: AxiomContext, input: ImageBytes): Promise<Par
     // ...) directly into the result root rather than nesting them under a
     // single "xmp" key — even with mergeOutput:false — so it can't share one
     // exifr.parse() call with the other blocks and still be told apart. Two
-    // calls on the same small (<=3 MiB) buffer is a trivial cost.
+    // calls on the same buffer is a trivial cost.
     const [main, xmp]: [any, any] = await Promise.all([
       exifr.parse(safe.buffer, {
         tiff: true,

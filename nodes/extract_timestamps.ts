@@ -10,8 +10,7 @@ import { toSafeBuffer, classifyParseError, dateToIso, padGpsTimeStamp } from './
  * file modification per EXIF), and the GPS timestamp (UTC, from satellite
  * time — often the most reliable of the four since it doesn't depend on the
  * camera's own clock being set correctly). found=false means none of these
- * were present. Input must be the image's leading header bytes, capped at
- * ~3 MiB.
+ * were present. Input must be the image's leading header bytes.
  *
  * @param ax - Platform context: ax.log for logging, ax.secrets for secrets.
  */
