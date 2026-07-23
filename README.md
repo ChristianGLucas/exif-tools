@@ -1,7 +1,7 @@
 # exif-tools
 
 Deterministic extraction of embedded metadata from image files — EXIF/TIFF, IPTC-IIM, XMP,
-ICC, and GPS — for the [Axiom](https://axiom.dev) marketplace, published as
+ICC, and GPS — for the [Axiom](https://axiomide.com) marketplace, published as
 `christiangeorgelucas/exif-tools`.
 
 Wraps [`exifr`](https://github.com/MikeKovarik/exifr) (MIT, pure JS, zero runtime
